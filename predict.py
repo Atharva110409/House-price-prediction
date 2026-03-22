@@ -4,7 +4,7 @@ import numpy as np
 
 
 def load_model(path="models/model.pkl"):
-    return joblib.load(path)
+    return joblib.load(r"C:\Users\athar\OneDrive\Desktop\ML_Project\house price prediction\data\data.csv")
 
 
 def predict(input_data):
