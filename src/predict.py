@@ -1,34 +1,68 @@
-import pickle
+import joblib
+import numpy as np
 import pandas as pd
-from datetime import datetime
 
 
-def predict():
-    # load models
-    lr_model = pickle.load(open("models/lr_model.pkl", "rb"))
-    rf_model = pickle.load(open("models/rf_model.pkl", "rb"))
-    scaler = pickle.load(open("models/scaler.pkl", "rb"))
+def load_model_and_scaler(model_path="models/model.pkl", scaler_path="models/scaler.pkl"):
+    """Load the saved model and scaler from disk."""
+    try:
+        model  = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)
+        print("[INFO] Model and scaler loaded successfully.")
+        return model, scaler
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"[ERROR] Could not load model/scaler: {e}\n"
+            "Make sure you have run main.py first to train and save the model."
+        )
 
-    print("\nEnter your house details:")
 
-    area = float(input("Area: "))
-    bedrooms = int(input("Bedrooms: "))
-    bathrooms = int(input("Bathrooms: "))
-    floors = int(input("Floors: "))
-    year_built = int(input("Year Built: "))
+def predict(input_features, model_path="models/model.pkl", scaler_path="models/scaler.pkl"):
+    """
+    Predict house price for given input features.
 
-    current_year = datetime.now().year
-    house_age = current_year - year_built
+    Args:
+        input_features (list or dict or pd.DataFrame):
+            - list  → raw numeric values in the same order as training features
+            - dict  → {feature_name: value, ...}
+            - DataFrame → single row DataFrame
 
-    user_data = pd.DataFrame([[area, bedrooms, bathrooms, floors, house_age]],
-                             columns=['Area', 'Bedrooms', 'Bathrooms', 'Floors', 'House_Age'])
+    Returns:
+        float: Predicted house price
+    """
+    model, scaler = load_model_and_scaler(model_path, scaler_path)
 
-    # scale for LR
-    user_scaled = scaler.transform(user_data)
+    # Convert input to numpy array
+    if isinstance(input_features, dict):
+        input_array = np.array(list(input_features.values())).reshape(1, -1)
+    elif isinstance(input_features, pd.DataFrame):
+        input_array = input_features.values
+    else:
+        input_array = np.array(input_features).reshape(1, -1)
 
-    # predict
-    lr_price = lr_model.predict(user_scaled)
-    rf_price = rf_model.predict(user_data)
+    # Scale the input using the saved scaler
+    input_scaled = scaler.transform(input_array)
 
-    print("\n🏠 Linear Regression Price:", lr_price[0])
-    print("🌲 Random Forest Price:", rf_price[0])
+    # Predict
+    predicted_price = model.predict(input_scaled)[0]
+    print(f"\n[PREDICTION] Estimated House Price: ₹{predicted_price:,.2f}")
+    return predicted_price
+
+
+def predict_batch(input_df, model_path="models/model.pkl", scaler_path="models/scaler.pkl"):
+    """
+    Predict house prices for multiple rows.
+
+    Args:
+        input_df (pd.DataFrame): DataFrame with feature columns (no target column)
+
+    Returns:
+        np.ndarray: Array of predicted prices
+    """
+    model, scaler = load_model_and_scaler(model_path, scaler_path)
+
+    input_scaled  = scaler.transform(input_df.values)
+    predictions   = model.predict(input_scaled)
+
+    print(f"[INFO] Predicted {len(predictions)} house prices.")
+    return predictions
